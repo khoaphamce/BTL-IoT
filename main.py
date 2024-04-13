@@ -3,6 +3,41 @@ print("Sensors and Actuators")
 import time
 import serial.tools.list_ports
 
+from Adafruit_IO import MQTTClient
+from teachable_ai import get_ai_info
+import sys
+
+AIO_FEED_ID = ["humid_update", "light_update"]
+AIO_USERNAME = "khoaphamce"
+AIO_KEY = "aio_qpyz29sOGxoKjdJD4bjwn3iLrbpS"
+
+def send_hum(client,hum):
+  print(f'Publishing  hum {hum}')
+  client.publish("humidity", hum)
+
+def send_light(client,light):
+  print(f'Publishing light {light}')
+  client.publish("light", light)
+
+def connected(client):
+    print("Connected ...")
+    for topic in AIO_FEED_ID:
+      client.subscribe(topic)
+
+def subscribe(client , userdata , mid , granted_qos):
+    print("Subscribed ...")
+
+def disconnected(client):
+    print("Disconnected ...")
+    sys.exit (1)
+
+def message(client , feed_id , payload):
+    print(f"============== {feed_id}: {payload} ==============")
+    if (feed_id == "humid_update"):
+       send_hum(client)
+    elif (feed_id == "light_update"):
+       send_light(client)
+
 def getPort():
     ports = serial.tools.list_ports.comports()
     N = len(ports)
@@ -17,7 +52,6 @@ def getPort():
 
 portName = getPort()
 print(portName)
-
 
 try:
     ser = serial.Serial(port=portName, baudrate=9600)
@@ -65,6 +99,14 @@ def readMoisture():
     time.sleep(1)
     return serial_read_data(ser)
 
+client = MQTTClient(AIO_USERNAME , AIO_KEY)
+client.on_connect = connected
+client.on_disconnect = disconnected
+client.on_message = message
+client.on_subscribe = subscribe
+client.connect ()
+client.loop_background ()
+
 while True:
     print("TEST ACTUATOR")
     setDevice1(True)
@@ -72,7 +114,9 @@ while True:
     setDevice1(False)
     time.sleep(2)
     print("TEST SENSOR")
-    print(readMoisture())
-    time.sleep(1)
-    print(readTemperature())
-    time.sleep(1)
+    # print(readMoisture())
+    send_hum(readMoisture())
+    time.sleep(2)
+    send_light(readTemperature())
+    # print(readTemperature())
+    time.sleep(2)
